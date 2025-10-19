@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CryptoZombies DApp (Ganache Local)</title>
+  <link rel="icon" href="favicon.ico">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/web3/1.2.7-rc.0/web3.min.js"></script>
+  <script src="cryptozombies_abi.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&display=swap" rel="stylesheet">
+
+  <style>
+  body {
+    font-family: 'Orbitron', sans-serif;
+    background: url('background.jpg') no-repeat center center fixed;
+    background-size: cover;
+    color: #ffcc99;
+    text-align: center;
+    margin: 0;
+  }
+
+  h2 {
+    text-shadow: 0 0 15px #ffa94d, 0 0 25px #ff6600;
+    color: #ffe0b3;
+    padding-top: 20px;
+    margin-bottom: 0;
+  }
+
+  #control-bar {
+    position: sticky;
+    top: 0;
+    width: 100%;
+    background: rgba(17, 0, 0, 0.85);
+    padding: 15px 0;
+    z-index: 100;
+    border-top: 2px solid #ff9933;
+    border-bottom: 2px solid #ff9933;
+    box-shadow: 0 0 20px #ff6600;
+    margin-top: 10px;
+  }
+
+  #control-bar button {
+    background-color: #ff6600;
+    color: #111;
+    border: none;
+    padding: 10px 20px;
+    margin: 5px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    box-shadow: 0 0 10px #ff9933;
+    transition: background 0.3s ease, transform 0.2s ease;
+  }
+
+  #control-bar button:hover {
+    background-color: #ff8533;
+    transform: scale(1.05);
+    box-shadow: 0 0 20px #ffcc66;
+  }
+
+  #txStatus {
+    display: block;
+    margin-top: 10px;
+    font-size: 16px;
+    text-shadow: 0 0 10px #ff6600;
+    color: #ffe6cc;
+    white-space: pre-line;
+  }
+
+  #zombies {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 30px;
+    position: relative;
+    margin: 40px 20px 60px;
+  }
+
+  /* 🧟 Flip animation setup */
+  .zombie {
+    perspective: 1200px;
+    width: 260px;
+    height: 480px; /* new code */
+    cursor: pointer;
+    position: relative;
+    transform-style: preserve-3d;
+    isolation: isolate;
+  }
+
+  .zombie-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    text-align: center;
+    transition: transform 0.8s;
+    transform-style: preserve-3d;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .zombie.flipped .zombie-inner {
+    transform: rotateY(180deg);
+  }
+
+  .zombie-front,
+  .zombie-back {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    border-radius: 15px;
+    border: 2px solid #ff9933;
+    box-shadow: 0 0 15px #ff6600;
+    background: rgba(0, 0, 0, 0.85);
+    padding: 15px;
+    color: #ffe6cc;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+  }
+
+  .zombie-front img {
+    width: 200px;
+    height: 200px;
+    border-radius: 10px;
+    margin-bottom: 10px;
+    border: 1px solid #ff9933;
+    box-shadow: 0 0 10px #ff6600;
+  }
+
+  .zombie-back {
+    transform: rotateY(180deg);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    color: #ffcc99;
+    text-shadow: 0 0 10px #ff6600;
+  }
+
+  .zombie.selected {
+    border: 2px solid #66ff99;
+    box-shadow: 0 0 30px hsl(150, 100%, 80%) !important;
+  }
+
+  /* ✅ Button styles inside card */
+  .zombie-actions {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    margin-top: auto;
+    padding-top: 10px;
+    width: 100%;
+  }
+
+  .deleteZombieBtn {
+    background-color: #cc3300;
+    color: #fff;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 5px;
+    z-index: 10;
+    cursor: pointer;
+    font-weight: bold;
+    box-shadow: 0 0 10px #ff3300;
+    transition: background 0.3s ease, transform 0.2s ease;
+  }
+
+  .deleteZombieBtn:hover {
+    background-color: #ff4d00;
+    transform: scale(1.05);
+    box-shadow: 0 0 20px #ff9933;
+  }
+
+  .renameZombieBtn {
+    background-color: #008080;
+    color: #fff;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 5px;
+    z-index: 10;
+    cursor: pointer;
+    font-weight: bold;
+    box-shadow: 0 0 10px #00b3b3;
+    transition: background 0.3s ease, transform 0.2s ease;
+  }
+
+  .renameZombieBtn:hover {
+    background-color: #00cccc;
+    transform: scale(1.05);
+    box-shadow: 0 0 20px #33ffff;
+  }
+
+  /* new code - Bulk modal overlay */
+  .bulk-modal-overlay {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 200;
+  }
+
+  /* new code - Bulk modal visibility */
+  .bulk-modal-overlay.is-visible {
+    display: flex;
+  }
+
+  /* new code - Bulk modal container */
+  .bulk-modal {
+    width: 90%;
+    max-width: 420px;
+    background: rgba(16, 24, 40, 0.95);
+    border-radius: 18px;
+    border: 2px solid #243b53;
+    padding: 28px 30px 32px;
+    box-shadow: 0 25px 45px rgba(0, 0, 0, 0.45);
+    color: #f7fafc;
+    text-align: left;
+  }
+
+  /* new code - Bulk modal heading */
+  .bulk-modal h3 {
+    margin-top: 0;
+    margin-bottom: 18px;
+    font-size: 24px;
+    color: #e3f8ff;
+    text-align: center;
+  }
+
+  /* new code - Bulk form field */
+  .bulk-field {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 12px;
+  }
+
+  /* new code - Bulk form label */
+  .bulk-field label {
+    font-size: 13px;
+    color: #c3dafe;
+    margin-bottom: 6px;
+  }
+
+  /* new code - Bulk form input */
+  .bulk-field input {
+    border-radius: 10px;
+    border: 1px solid #334155;
+    padding: 10px 12px;
+    font-size: 14px;
+    background: rgba(15, 23, 42, 0.8);
+    color: #f8fafc;
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  /* new code - Bulk form input focus */
+  .bulk-field input:focus {
+    border-color: #4f46e5;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.3);
+  }
+
+  /* new code - Bulk row wrapper */
+  .bulk-row {
+    background: rgba(30, 41, 59, 0.75);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 14px;
+    padding: 14px;
+    margin-bottom: 14px;
+  }
+
+  /* new code - Add row button */
+  .bulk-add-row {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: none;
+    background: radial-gradient(circle, #34d399 0%, #059669 100%);
+    color: #0b1120;
+    font-size: 24px;
+    line-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    margin: 6px auto 20px;
+    box-shadow: 0 0 18px rgba(16, 185, 129, 0.4);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  /* new code - Add row hover */
+  .bulk-add-row:hover {
+    transform: scale(1.08);
+    box-shadow: 0 0 28px rgba(16, 185, 129, 0.7);
+  }
+
+  /* new code - Bulk modal actions */
+  .bulk-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: space-between;
+  }
+
+  /* new code - Bulk submit button */
+  .bulk-submit {
+    flex: 1;
+    background: #2563eb;
+    color: #f8fafc;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 0;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.2s ease;
+  }
+
+  /* new code - Bulk submit hover */
+  .bulk-submit:hover {
+    background: #1d4ed8;
+  }
+
+  /* new code - Bulk cancel button */
+  .bulk-cancel {
+    flex: 1;
+    background: #ef4444;
+    color: #f8fafc;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 0;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.2s ease;
+  }
+
+  /* new code - Bulk cancel hover */
+  .bulk-cancel:hover {
+    background: #dc2626;
+  }
+
+  /* new code - Bulk helper text */
+  .bulk-helper {
+    font-size: 12px;
+    color: #9ca3af;
+    margin: 0 0 18px;
+    text-align: center;
+  }
+  </style>
+</head>
+
+<body>
+  <h2>CryptoZombies DApp (Ganache Local)</h2>
+
+  <div id="control-bar">
+    <button class="showZombieButton">Show Zombies</button>
+    <button class="createzombieButton">Create Zombie</button>
+    <!-- new code -->
+    <button class="bulkCreateButton">Zombie Army Creation</button>
+    <button class="levelupButton">Level Up</button>
+    <button class="breedButton">Breed Zombies</button>
+    <div id="txStatus"></div>
+  </div>
+
+  <div id="zombies"></div>
+
+  <!-- new code -->
+  <div id="bulkCreateOverlay" class="bulk-modal-overlay">
+    <div class="bulk-modal">
+      <h3>Bulk Create Zombies</h3>
+      <p class="bulk-helper">Provide names for the zombies you want to deploy.</p>
+      <div id="bulkZombieRows"></div>
+      <button id="addBulkZombieRow" class="bulk-add-row" type="button">+</button>
+      <div class="bulk-actions">
+        <button id="bulkSubmit" class="bulk-submit" type="button">Submit</button>
+        <button id="bulkCancel" class="bulk-cancel" type="button">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const CONTRACT_ADDRESS = "0x9941Fd36dA8F81d721aF01969B5858e39f2CeC32";
+    var cryptoZombies;
+    var userAccount;
+
+    const zombieDescriptions = [
+      "Lurks in the shadows and feeds on blockchain bugs.",
+      "A fast learner — devours code and brains equally.",
+      "Once a programmer, now a debugging machine.",
+      "Feeds on the weak... and untested smart contracts.",
+      "Was deployed without testing — now seeks revenge.",
+      "Haunts abandoned repositories and testnets.",
+      "Known to fork repositories and eat the maintainers.",
+      "Still waiting for its transaction to confirm.",
+      "Corrupted by an infinite gas loop.",
+      "Reanimated by decentralized necromancy."
+    ];
+
+    const showZombieButton = document.querySelector('.showZombieButton');
+    const createzombieButton = document.querySelector('.createzombieButton');
+    const levelupButton = document.querySelector('.levelupButton');
+    const breedButton = document.querySelector('.breedButton');
+    // new code
+    const bulkCreateButton = document.querySelector('.bulkCreateButton');
+    // new code
+    const bulkOverlay = document.getElementById('bulkCreateOverlay');
+    // new code
+    const bulkRowsContainer = document.getElementById('bulkZombieRows');
+    // new code
+    const addBulkRowButton = document.getElementById('addBulkZombieRow');
+    // new code
+    const bulkSubmitButton = document.getElementById('bulkSubmit');
+    // new code
+    const bulkCancelButton = document.getElementById('bulkCancel');
+    let selectedZombies = [];
+    let breedMode = false;
+
+    async function startApp() {
+      cryptoZombies = new web3.eth.Contract(cryptoZombiesABI, CONTRACT_ADDRESS);
+      const accounts = await web3.eth.getAccounts();
+      userAccount = accounts[0];
+      cryptoZombies.events.Transfer({ filter: { _to: userAccount } })
+        .on("data", () => getZombiesByOwner(userAccount).then(displayZombies))
+        .on("error", console.error);
+    }
+
+    function getZombieDetails(id) {
+      return cryptoZombies.methods.zombies(id).call();
+    }
+
+    function getZombiesByOwner(owner) {
+      return cryptoZombies.methods.getZombiesByOwner(owner).call();
+    }
+
+    function getRandomDescription() {
+      return zombieDescriptions[Math.floor(Math.random() * zombieDescriptions.length)];
+    }
+
+    // new code
+    function toggleBulkModal(show) {
+      bulkOverlay.classList.toggle('is-visible', show);
+      if (show) {
+        resetBulkRows();
+        setTimeout(() => { // new code
+          const firstInput = bulkRowsContainer.querySelector('.bulk-name-input');
+          if (firstInput) {
+            firstInput.focus(); // new code
+          }
+        }, 0);
+      }
+    }
+
+    // new code
+    function resetBulkRows() {
+      bulkRowsContainer.innerHTML = '';
+      addBulkZombieRow();
+      addBulkZombieRow();
+    }
+
+    // new code
+    function addBulkZombieRow(nameValue = '') {
+      const row = document.createElement('div');
+      row.className = 'bulk-row';
+
+      const nameField = document.createElement('div');
+      nameField.className = 'bulk-field';
+      const nameLabel = document.createElement('label');
+      nameLabel.textContent = 'Name:';
+      const nameInput = document.createElement('input');
+      nameInput.className = 'bulk-name-input';
+      nameInput.type = 'text';
+      nameInput.placeholder = 'Zombie name';
+      nameInput.value = nameValue;
+
+      nameField.appendChild(nameLabel);
+      nameField.appendChild(nameInput);
+      row.appendChild(nameField);
+
+      bulkRowsContainer.appendChild(row);
+    }
+
+    // new code
+    async function handleBulkSubmit() {
+      const rows = Array.from(bulkRowsContainer.querySelectorAll('.bulk-row'));
+      const zombiesToCreate = rows.map((row) => {
+        const name = row.querySelector('.bulk-name-input').value.trim();
+        return { name };
+      }).filter((entry) => entry.name.length > 0);
+
+      if (zombiesToCreate.length < 2) {
+        alert("Please provide at least two zombie names to bulk create.");
+        return;
+      }
+
+      toggleBulkModal(false);
+      await bulkCreateZombies(zombiesToCreate);
+    }
+
+    // new code
+    async function bulkCreateZombies(zombieEntries) {
+      $("#txStatus").text(`Creating ${zombieEntries.length} zombies...`);
+
+      try {
+        for (let index = 0; index < zombieEntries.length; index++) {
+          const entry = zombieEntries[index];
+          $("#txStatus").text(`Creating zombie ${index + 1}/${zombieEntries.length}: ${entry.name}...`);
+          await createRandomZombieTx(entry.name);
+        }
+        $("#txStatus").text(`🎉 Created ${zombieEntries.length} zombies!`);
+        getZombiesByOwner(userAccount).then(displayZombies);
+      } catch (err) {
+        $("#txStatus").text(`❌ Bulk create failed: ${err.message}`);
+      }
+    }
+
+    // new code
+    function createRandomZombieTx(name) {
+      return cryptoZombies.methods.createRandomZombie(name)
+        .send({ from: userAccount, gas: 500000 });
+    }
+
+    // 🧟 Display Zombies
+    function displayZombies(ids) {
+      $("#zombies").empty();
+      ids.forEach((id) => {
+        getZombieDetails(id).then((zombie) => {
+          const avatarUrl = `https://api.dicebear.com/9.x/bottts/svg?seed=${zombie.dna}`;
+          const randomDesc = getRandomDescription();
+
+          const zombieCard = $(`
+            <div class="zombie" data-id="${id}">
+              <div class="zombie-inner">
+                <div class="zombie-front">
+                  <img src="${avatarUrl}" alt="Zombie Avatar">
+                  <ul>
+                    <li><b>ID:</b> ${id}</li>
+                    <li><b>Name:</b> ${zombie.name}</li>
+                    <li><b>DNA:</b> ${zombie.dna}</li>
+                    <li><b>Level:</b> ${zombie.level}</li>
+                    <li><b>Wins:</b> ${zombie.winCount}</li>
+                    <li><b>Losses:</b> ${zombie.lossCount}</li>
+                    <li><b>Ready Time:</b> ${zombie.readyTime}</li>
+                  </ul>
+                  <div class="zombie-actions">
+                    <button class="deleteZombieBtn" data-id="${id}">🗑️ Delete</button>
+                    <button class="renameZombieBtn" data-id="${id}">✏️ Rename</button>
+                  </div>
+                </div>
+                <div class="zombie-back">
+                  <p>${randomDesc}</p>
+                </div>
+              </div>
+            </div>
+          `);
+
+          zombieCard.on("click", function (e) {
+            if ($(e.target).hasClass("deleteZombieBtn") || $(e.target).hasClass("renameZombieBtn")) return;
+            if (breedMode) return;
+            $(this).toggleClass("flipped");
+          });
+
+          zombieCard.find(".deleteZombieBtn").on("click", async function () {
+            const zombieId = $(this).data("id");
+            const ok = confirm(`Are you sure you want to delete Zombie #${zombieId}?`);
+            if (!ok) return;
+            $("#txStatus").text(`Deleting Zombie #${zombieId}...`);
+            try {
+              await cryptoZombies.methods.deleteZombie(zombieId).send({ from: userAccount, gas: 300000 });
+              $("#txStatus").text(`🗑️ Zombie #${zombieId} deleted.`);
+              getZombiesByOwner(userAccount).then(displayZombies);
+            } catch (err) {
+              $("#txStatus").text(`❌ Delete failed: ${err.message}`);
+            }
+          });
+
+          zombieCard.find(".renameZombieBtn").on("click", async function () {
+            const zombieId = $(this).data("id");
+            const newName = prompt("Enter new name:");
+            if (!newName) return;
+            try {
+              await cryptoZombies.methods.changeName(zombieId, newName).send({ from: userAccount, gas: 300000 });
+              $("#txStatus").text(`✅ Renamed to "${newName}"`);
+              getZombiesByOwner(userAccount).then(displayZombies);
+            } catch (err) {
+              $("#txStatus").text(`❌ Rename failed: ${err.message}`);
+            }
+          });
+
+          $("#zombies").append(zombieCard);
+        });
+      });
+    }
+
+    // 🧬 BREED FEATURE
+    breedButton.addEventListener('click', () => {
+      breedMode = !breedMode;
+      selectedZombies = [];
+      $("#txStatus").text(breedMode ? "🧬 Select two zombies to breed..." : "");
+      breedButton.textContent = breedMode ? "Cancel Breed" : "Breed Zombies";
+      $(".zombie").removeClass("selected");
+    });
+
+    $(document).on("click", ".zombie", async function (e) {
+      if (!breedMode || $(e.target).hasClass("deleteZombieBtn") || $(e.target).hasClass("renameZombieBtn")) return;
+      const zombieId = $(this).data("id");
+      if (selectedZombies.includes(zombieId)) return;
+      selectedZombies.push(zombieId);
+      $(this).addClass("selected");
+
+      if (selectedZombies.length === 2) {
+        $("#txStatus").text("🧬 Two zombies selected! Preparing to breed...");
+        setTimeout(async () => {
+          const name = prompt("Enter the new zombie's name:");
+          if (!name) {
+            $("#txStatus").text("⚠️ Breeding cancelled.");
+            breedMode = false;
+            breedButton.textContent = "Breed Zombies";
+            selectedZombies = [];
+            $(".zombie").removeClass("selected");
+            return;
+          }
+          await breedZombiesTx(selectedZombies[0], selectedZombies[1], name);
+          breedMode = false;
+          breedButton.textContent = "Breed Zombies";
+          selectedZombies = [];
+          $(".zombie").removeClass("selected");
+        }, 500);
+      }
+    });
+
+    async function breedZombiesTx(parent1, parent2, name) {
+      try {
+        $("#txStatus").text("🧬 Breeding in progress...");
+        await cryptoZombies.methods.breedZombies(parent1, parent2, name)
+          .send({ from: userAccount, gas: 500000 });
+        $("#txStatus").text(`🎉 New zombie "${name}" created!`);
+        getZombiesByOwner(userAccount).then(displayZombies);
+      } catch (err) {
+        $("#txStatus").text(`❌ Breeding failed: ${err.message}`);
+      }
+    }
+
+    window.addEventListener("load", async () => {
+      web3 = new Web3("http://127.0.0.1:7545");
+      await startApp();
+    });
+
+    // new code
+    bulkCreateButton.addEventListener('click', () => {
+      toggleBulkModal(true);
+    });
+
+    // new code
+    addBulkRowButton.addEventListener('click', () => {
+      addBulkZombieRow();
+    });
+
+    // new code
+    bulkCancelButton.addEventListener('click', () => {
+      toggleBulkModal(false);
+    });
+
+    // new code
+    bulkOverlay.addEventListener('click', (event) => {
+      if (event.target === bulkOverlay) {
+        toggleBulkModal(false);
+      }
+    });
+
+    // new code
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && bulkOverlay.classList.contains('is-visible')) {
+        toggleBulkModal(false);
+      }
+    });
+
+    // new code
+    bulkSubmitButton.addEventListener('click', () => {
+      handleBulkSubmit();
+    });
+
+    createzombieButton.addEventListener('click', () => {
+      const name = prompt("Enter your zombie's name:");
+      if (name) createRandomZombie(name);
+    });
+
+    function createRandomZombie(name) {
+      $("#txStatus").text("Creating new zombie...");
+      cryptoZombies.methods.createRandomZombie(name)
+        .send({ from: userAccount, gas: 500000 })
+        .on("receipt", () => {
+          $("#txStatus").text("Successfully created " + name + "!");
+          getZombiesByOwner(userAccount).then(displayZombies);
+        })
+        .on("error", (error) => {
+          $("#txStatus").text("Error: " + error.message);
+        });
+    }
+
+    showZombieButton.addEventListener('click', () => {
+      getZombiesByOwner(userAccount).then(displayZombies);
+    });
+
+    levelupButton.addEventListener('click', () => {
+      const id = prompt("Enter the ID of the zombie to level up:");
+      if (id) levelUp(id);
+    });
+
+    function levelUp(zombieId) {
+      $("#txStatus").text("Leveling up...");
+      cryptoZombies.methods.levelUp(zombieId)
+        .send({ from: userAccount, value: web3.utils.toWei("0.001", "ether"), gas: 500000 })
+        .on("receipt", () => {
+          $("#txStatus").text("Zombie leveled up!");
+          getZombiesByOwner(userAccount).then(displayZombies);
+        });
+    }
+  </script>
+</body>
+</html>
